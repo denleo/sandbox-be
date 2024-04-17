@@ -1,0 +1,83 @@
+volumes:
+ identity-db-volume:
+ wordbook-db-volume:
+
+networks:
+  backend-network:
+  identity-network:
+  wordbook-service-network:
+
+services:
+  identity-db:
+    container_name: identity-db
+    image: postgres
+    ports:
+      - 5454:5432
+    networks:
+      - identity-network
+    volumes:
+      - identity-db-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=identity_db
+
+  wordbook-db:
+    container_name: wordbook-db
+    image: postgres
+    ports:
+      - 5455:5432
+    networks:
+      - wordbook-service-network
+    volumes:
+      - wordbook-db-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=wordbook_db
+
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    container_name: 'rabbitmq'
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    ports:
+        - 15672:15672
+    networks:
+        - backend-network
+
+  gateway:
+    container_name: gateway
+    ports:
+      - 8080:8080
+    networks:
+      - backend-network
+      - identity-network
+    build:
+      context: .
+      dockerfile: /Gateway/Dockerfile
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    depends_on:
+      - identity-db
+      - rabbitmq
+      
+  wordbook-service:
+    container_name: wordbook-service
+    ports:
+      - 5050:8080
+    networks:
+      - backend-network
+      - wordbook-service-network
+    build:
+      context: .
+      dockerfile: /Wordbook/Sandbox.Wordbook.API/Dockerfile
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    depends_on:
+      - wordbook-db
+      - rabbitmq
